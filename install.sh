@@ -117,8 +117,15 @@ check_and_install_dependencies() {
         missing_deps+=("python3-pip")
     fi
     
+    # Check for venv module - this is the critical fix
     if ! python3 -c "import venv" &> /dev/null; then
-        missing_deps+=("python3-venv")
+        # Try to determine the right venv package name
+        PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+        if [[ "$OS" == "debian" ]]; then
+            missing_deps+=("python${PYTHON_VERSION}-venv")
+        else
+            missing_deps+=("python3-venv")
+        fi
     fi
     
     if ! command -v git &> /dev/null; then
@@ -170,7 +177,15 @@ install_dependencies_now() {
     
     if [[ "$OS" == "debian" ]]; then
         apt-get update
-        apt-get install -y python3 python3-pip python3-venv git curl wget unzip
+        # Install basic packages first
+        apt-get install -y python3 python3-pip git curl wget unzip
+        
+        # Install the correct venv package
+        PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "3")
+        if ! python3 -c "import venv" &> /dev/null; then
+            print_status "Installing Python venv package for version $PYTHON_VERSION..."
+            apt-get install -y "python${PYTHON_VERSION}-venv" || apt-get install -y python3-venv
+        fi
     elif [[ "$OS" == "redhat" ]]; then
         if command -v dnf &> /dev/null; then
             dnf install -y python3 python3-pip git curl wget unzip
@@ -183,7 +198,7 @@ install_dependencies_now() {
 }
 
 check_and_detect_openvpn() {
-    print_status "Checking OpenVPN installation and detecting configuration type..."
+    print_status "Checking OpenVPN installation..."
     
     if ! command -v openvpn &> /dev/null; then
         print_error "OpenVPN is not installed. Please install OpenVPN first."
@@ -198,165 +213,76 @@ check_and_detect_openvpn() {
     OPENVPN_VERSION=$(openvpn --version | head -n1 | awk '{print $2}')
     echo -e "${GREEN}✅ OpenVPN found: $OPENVPN_VERSION${NC}"
     
-    # Detect OpenVPN installation type
-    OPENVPN_TYPE="unknown"
-    OPENVPN_COMPATIBILITY_SCORE=0
-    
     echo ""
-    print_status "🔍 Detecting OpenVPN installation type..."
+    print_status "🔍 Checking for client management tools..."
     
-    # Check for Angristan installation
-    if [[ -f /usr/local/bin/openvpn-install.sh ]] || [[ -f /root/openvpn-install.sh ]] || [[ -f /usr/sbin/openvpn-install.sh ]]; then
-        OPENVPN_TYPE="angristan"
+    # Check what client management tools are available
+    HAS_CLIENT_TOOLS=false
+    CLIENT_TOOLS_INFO=""
+    
+    # Check for Angristan script
+    for script in /usr/local/bin/openvpn-install.sh /root/openvpn-install.sh /usr/sbin/openvpn-install.sh; do
+        if [[ -f "$script" ]]; then
+            HAS_CLIENT_TOOLS=true
+            CLIENT_TOOLS_INFO="✅ Found OpenVPN management script: $script"
+            break
+        fi
+    done
+    
+    # Check for EasyRSA if no script found
+    if [[ "$HAS_CLIENT_TOOLS" != true ]]; then
+        if command -v easyrsa &> /dev/null || [[ -d /etc/openvpn/easy-rsa ]] || [[ -d /usr/share/easy-rsa ]]; then
+            HAS_CLIENT_TOOLS=true
+            if command -v easyrsa &> /dev/null; then
+                CLIENT_TOOLS_INFO="✅ Found EasyRSA: $(which easyrsa)"
+            else
+                for dir in /etc/openvpn/easy-rsa /usr/share/easy-rsa /opt/easy-rsa; do
+                    if [[ -d "$dir" ]] && [[ -f "$dir/easyrsa" ]]; then
+                        CLIENT_TOOLS_INFO="✅ Found EasyRSA: $dir"
+                        break
+                    fi
+                done
+            fi
+        fi
+    fi
+    
+    # Show results
+    echo ""
+    if [[ "$HAS_CLIENT_TOOLS" == true ]]; then
+        echo -e "${GREEN}🎉 FULL OPENVPN SETUP DETECTED${NC}"
+        echo -e "${GREEN}   $CLIENT_TOOLS_INFO${NC}"
+        echo -e "${GREEN}   ✅ Client creation and management available${NC}"
+        echo -e "${GREEN}   ✅ Complete EasyOVPN functionality${NC}"
         OPENVPN_COMPATIBILITY_SCORE=100
-        echo ""
-        echo -e "${GREEN}🚀 ANGRISTAN OPENVPN INSTALLATION DETECTED${NC}"
-        echo -e "${GREEN}   ✅ Full compatibility - all features will be available${NC}"
-        echo -e "${GREEN}   ✅ Automatic client creation and revocation${NC}"
-        echo -e "${GREEN}   ✅ Complete certificate management${NC}"
-        
-        # Find and display script location
-        for script in /usr/local/bin/openvpn-install.sh /root/openvpn-install.sh /usr/sbin/openvpn-install.sh; do
-            if [[ -f "$script" ]]; then
-                echo -e "${BLUE}   📂 Script location: $script${NC}"
-                break
-            fi
-        done
-        
-        print_success "EasyOVPN will use Angristan script for client management"
-
-    # Check for EasyRSA installation
-    elif command -v easyrsa &> /dev/null || [[ -d /etc/openvpn/easy-rsa ]] || [[ -d /usr/share/easy-rsa ]]; then
-        OPENVPN_TYPE="easyrsa"
-        OPENVPN_COMPATIBILITY_SCORE=95
-        echo ""
-        echo -e "${GREEN}🔑 STANDARD OPENVPN WITH EASYRSA DETECTED${NC}"
-        echo -e "${GREEN}   ✅ Full compatibility - all features will be available${NC}"
-        echo -e "${GREEN}   ✅ Automatic client creation using EasyRSA commands${NC}"
-        echo -e "${GREEN}   ✅ Certificate revocation with CRL generation${NC}"
-        
-        # Show EasyRSA details
-        if command -v easyrsa &> /dev/null; then
-            EASYRSA_PATH=$(which easyrsa)
-            echo -e "${BLUE}   📂 EasyRSA command: $EASYRSA_PATH${NC}"
-        fi
-        
-        for dir in /etc/openvpn/easy-rsa /usr/share/easy-rsa /opt/easy-rsa; do
-            if [[ -d "$dir" ]]; then
-                echo -e "${BLUE}   📂 EasyRSA directory: $dir${NC}"
-                break
-            fi
-        done
-        
-        # Check PKI initialization
-        PKI_FOUND=false
-        for pki_dir in /etc/openvpn/easy-rsa/pki /etc/openvpn/pki /etc/ssl/openvpn/pki; do
-            if [[ -d "$pki_dir" ]] && [[ -f "$pki_dir/ca.crt" ]]; then
-                echo -e "${BLUE}   📂 PKI directory: $pki_dir${NC}"
-                PKI_FOUND=true
-                break
-            fi
-        done
-        
-        if [[ "$PKI_FOUND" != true ]]; then
-            echo -e "${YELLOW}   ⚠️  PKI not initialized. EasyOVPN will attempt to use EasyRSA anyway.${NC}"
-            OPENVPN_COMPATIBILITY_SCORE=80
-        fi
-        
-        print_success "EasyOVPN will use EasyRSA commands for client management"
-
-    # Check for basic OpenVPN installation
-    elif [[ -f /etc/openvpn/server.conf ]] || [[ -f /etc/openvpn/server/server.conf ]]; then
-        OPENVPN_TYPE="manual"
+    else
+        echo -e "${YELLOW}⚠️  BASIC OPENVPN INSTALLATION${NC}"
+        echo -e "${YELLOW}   ✅ OpenVPN server is running${NC}"
+        echo -e "${YELLOW}   ❌ No client management tools found${NC}"
+        echo -e "${YELLOW}   📊 EasyOVPN will work in monitoring mode only${NC}"
         OPENVPN_COMPATIBILITY_SCORE=50
-        echo ""
-        echo -e "${YELLOW}🔧 MANUAL OPENVPN INSTALLATION DETECTED${NC}"
-        echo -e "${YELLOW}   ⚠️  Limited compatibility - monitoring features only${NC}"
-        echo -e "${YELLOW}   ❌ Client creation/revocation not available${NC}"
-        echo -e "${YELLOW}   ✅ Connection monitoring and statistics will work${NC}"
-        
-        for config in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
-            if [[ -f "$config" ]]; then
-                echo -e "${BLUE}   📂 Server config: $config${NC}"
-                break
-            fi
-        done
         
         echo ""
-        echo -e "${YELLOW}💡 To enable full functionality, consider:${NC}"
-        echo -e "${YELLOW}   • Installing EasyRSA: apt install easy-rsa${NC}"
-        echo -e "${YELLOW}   • Or using Angristan's script for complete automation${NC}"
+        echo -e "${YELLOW}💡 To enable client management, install:${NC}"
+        echo -e "${YELLOW}   • EasyRSA: apt install easy-rsa${NC}"
+        echo -e "${YELLOW}   • Or use Angristan's script for full automation${NC}"
         
         if [[ "$DEFAULT_INSTALL" != true ]]; then
             echo ""
-            read -p "Do you want to continue with limited functionality? (y/N): " continue_limited
+            read -p "Continue with monitoring-only functionality? (y/N): " continue_limited
             if [[ "$continue_limited" != "y" && "$continue_limited" != "Y" ]]; then
-                print_error "Installation cancelled. Please install EasyRSA or use Angristan's script."
+                print_error "Installation cancelled. Install EasyRSA or Angristan script for full functionality."
                 exit 1
-            fi
-        fi
-
-    else
-        OPENVPN_TYPE="none"
-        OPENVPN_COMPATIBILITY_SCORE=0
-        echo ""
-        print_error "❌ NO OPENVPN SERVER CONFIGURATION DETECTED"
-        print_error "Please configure OpenVPN server first before installing EasyOVPN"
-        echo ""
-        echo -e "${BLUE}Quick setup options:${NC}"
-        echo -e "${BLUE}1. Angristan script (recommended): curl -O https://raw.githubusercontent.com/angristan/openvpn-install/master/openvpn-install.sh && sudo bash openvpn-install.sh${NC}"
-        echo -e "${BLUE}2. Package install: apt install openvpn easy-rsa${NC}"
-        exit 1
-    fi
-    
-    # Install EasyRSA if needed and possible
-    if [[ "$OPENVPN_TYPE" == "easyrsa" ]]; then
-        if ! command -v easyrsa &> /dev/null && [[ ! -f /etc/openvpn/easy-rsa/easyrsa ]]; then
-            echo ""
-            print_warning "EasyRSA command not found. Installing easy-rsa package..."
-            if [[ "$AUTO_INSTALL_DEPS" == true ]] || [[ "$DEFAULT_INSTALL" == true ]]; then
-                if [[ "$OS" == "debian" ]]; then
-                    apt-get install -y easy-rsa
-                elif [[ "$OS" == "redhat" ]]; then
-                    if command -v dnf &> /dev/null; then
-                        dnf install -y easy-rsa
-                    else
-                        yum install -y easy-rsa
-                    fi
-                fi
-                print_success "EasyRSA installed successfully"
-            else
-                read -p "Would you like to install easy-rsa package? (Y/n): " install_easyrsa
-                if [[ "$install_easyrsa" != "n" && "$install_easyrsa" != "N" ]]; then
-                    if [[ "$OS" == "debian" ]]; then
-                        apt-get install -y easy-rsa
-                    elif [[ "$OS" == "redhat" ]]; then
-                        if command -v dnf &> /dev/null; then
-                            dnf install -y easy-rsa
-                        else
-                            yum install -y easy-rsa
-                        fi
-                    fi
-                    print_success "EasyRSA installed successfully"
-                fi
             fi
         fi
     fi
     
     echo ""
-    echo -e "${BLUE}📊 COMPATIBILITY SUMMARY:${NC}"
-    echo -e "${BLUE}   Installation Type: ${NC}$OPENVPN_TYPE"
-    echo -e "${BLUE}   Compatibility Score: ${NC}$OPENVPN_COMPATIBILITY_SCORE/100"
+    echo -e "${BLUE}📊 SETUP SUMMARY:${NC}"
+    echo -e "${BLUE}   OpenVPN Version: ${NC}$OPENVPN_VERSION"
+    echo -e "${BLUE}   Client Management: ${NC}$([ "$HAS_CLIENT_TOOLS" == true ] && echo "Available" || echo "Not Available")"
+    echo -e "${BLUE}   EasyOVPN Features: ${NC}$([ "$HAS_CLIENT_TOOLS" == true ] && echo "Full" || echo "Monitoring Only")"
     
-    if [[ $OPENVPN_COMPATIBILITY_SCORE -ge 90 ]]; then
-        echo -e "${GREEN}   🎉 Excellent! All EasyOVPN features will be available.${NC}"
-    elif [[ $OPENVPN_COMPATIBILITY_SCORE -ge 70 ]]; then
-        echo -e "${YELLOW}   ✅ Good! EasyOVPN will work with minor limitations.${NC}"
-    elif [[ $OPENVPN_COMPATIBILITY_SCORE -ge 50 ]]; then
-        echo -e "${YELLOW}   ⚠️  Limited! Only monitoring features will be available.${NC}"
-    fi
-    
-    print_success "OpenVPN compatibility check completed"
+    print_success "OpenVPN check completed"
 }
 
 create_user() {
@@ -405,13 +331,45 @@ setup_python_env() {
     
     cd "$EASYVPN_DIR"
     
-    # Create virtual environment
-    python3 -m venv "$PYTHON_VENV"
+    # Test venv capability before creating
+    if ! python3 -c "import venv" &> /dev/null; then
+        print_error "Python venv module not available. Please install python3-venv package."
+        echo ""
+        echo -e "${YELLOW}Quick fix:${NC}"
+        PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "3.12")
+        echo -e "${BLUE}apt install python${PYTHON_VERSION}-venv${NC}"
+        exit 1
+    fi
+    
+    # Create virtual environment with better error handling
+    if ! python3 -m venv "$PYTHON_VENV"; then
+        print_error "Failed to create Python virtual environment"
+        print_error "This usually means the python3-venv package is not installed"
+        echo ""
+        echo -e "${YELLOW}Please run:${NC}"
+        PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "3.12")
+        echo -e "${BLUE}apt install python${PYTHON_VERSION}-venv${NC}"
+        echo -e "${BLUE}Then re-run this installer${NC}"
+        exit 1
+    fi
     
     # Activate and install packages
     source "$PYTHON_VENV/bin/activate"
-    pip install --upgrade pip
-    pip install -r requirements.txt
+    
+    # Upgrade pip first
+    if ! pip install --upgrade pip; then
+        print_warning "Failed to upgrade pip, continuing anyway..."
+    fi
+    
+    # Install requirements
+    if [[ -f requirements.txt ]]; then
+        if ! pip install -r requirements.txt; then
+            print_error "Failed to install Python requirements"
+            exit 1
+        fi
+    else
+        print_warning "requirements.txt not found, skipping Python package installation"
+    fi
     
     chown -R easyvpn:easyvpn "$PYTHON_VENV"
     

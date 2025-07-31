@@ -47,9 +47,10 @@ CONFIG = {
     'MAX_LOGIN_ATTEMPTS': 5,
     'LOGIN_TIMEOUT': 300,  # 5 minutes
     'OPENVPN_SCRIPT': '/usr/local/bin/openvpn-install.sh',
-    'INSTALLATION_TYPE': 'unknown',  # Will be detected: 'angristan', 'easyrsa', 'manual'
+    'INSTALLATION_TYPE': 'unknown',  # Will be detected
     'EASYRSA_DIR': None,
-    'CA_DIR': None
+    'CA_DIR': None,
+    'CAN_CREATE_CLIENTS': False  # Will be set based on available tools
 }
 
 # Auto-detect OpenVPN configuration paths and installation type
@@ -101,8 +102,14 @@ def detect_openvpn_paths():
     logger.info(f"OpenVPN installation detected: type={CONFIG['INSTALLATION_TYPE']}, config={CONFIG['SERVER_CONFIG']}, clients={CONFIG['CLIENT_DIR']}, status={CONFIG['STATUS_LOG']}")
 
 def detect_installation_type():
-    """Detect OpenVPN installation type"""
-    # Check for Angristan script
+    """Detect OpenVPN installation type - simplified approach"""
+    # Just check if we can manage clients - don't overcomplicate it
+    CONFIG['INSTALLATION_TYPE'] = 'openvpn'
+    
+    # Check if we have any way to create clients
+    can_create_clients = False
+    
+    # Check for Angristan script (if it exists, we can use it)
     angristan_script_paths = [
         '/usr/local/bin/openvpn-install.sh',
         '/root/openvpn-install.sh',
@@ -111,55 +118,44 @@ def detect_installation_type():
     
     for script_path in angristan_script_paths:
         if os.path.exists(script_path):
-            CONFIG['INSTALLATION_TYPE'] = 'angristan'
             CONFIG['OPENVPN_SCRIPT'] = script_path
-            logger.info(f"Detected Angristan installation with script: {script_path}")
-            return
+            can_create_clients = True
+            logger.info(f"Found OpenVPN management script: {script_path}")
+            break
     
-    # Check for EasyRSA
-    easyrsa_paths = [
-        '/etc/openvpn/easy-rsa',
-        '/usr/share/easy-rsa',
-        '/opt/easy-rsa',
-        '/etc/easy-rsa',
-    ]
-    
-    for easyrsa_dir in easyrsa_paths:
-        if os.path.exists(easyrsa_dir):
-            # Check if easyrsa executable exists
+    # Check for EasyRSA (alternative way to create clients)
+    if not can_create_clients:
+        try:
+            result = subprocess.run(['which', 'easyrsa'], capture_output=True, text=True)
+            if result.returncode == 0:
+                can_create_clients = True
+                logger.info("Found EasyRSA for client management")
+        except:
+            pass
+        
+        # Also check common EasyRSA directories
+        easyrsa_paths = [
+            '/etc/openvpn/easy-rsa',
+            '/usr/share/easy-rsa',
+            '/opt/easy-rsa',
+        ]
+        
+        for easyrsa_dir in easyrsa_paths:
             easyrsa_executable = os.path.join(easyrsa_dir, 'easyrsa')
             if os.path.exists(easyrsa_executable):
-                CONFIG['INSTALLATION_TYPE'] = 'easyrsa'
                 CONFIG['EASYRSA_DIR'] = easyrsa_dir
-                
-                # Find PKI directory
-                possible_pki_dirs = [
-                    os.path.join(easyrsa_dir, 'pki'),
-                    '/etc/openvpn/pki',
-                    '/etc/ssl/openvpn',
-                ]
-                
-                for pki_dir in possible_pki_dirs:
-                    if os.path.exists(pki_dir) and os.path.exists(os.path.join(pki_dir, 'ca.crt')):
-                        CONFIG['CA_DIR'] = pki_dir
-                        break
-                
-                logger.info(f"Detected EasyRSA installation: {easyrsa_dir}, PKI: {CONFIG['CA_DIR']}")
-                return
+                can_create_clients = True
+                logger.info(f"Found EasyRSA installation: {easyrsa_dir}")
+                break
     
-    # Check if we can find easyrsa command in PATH
-    try:
-        result = subprocess.run(['which', 'easyrsa'], capture_output=True, text=True)
-        if result.returncode == 0:
-            CONFIG['INSTALLATION_TYPE'] = 'easyrsa'
-            logger.info("Detected EasyRSA installation via system PATH")
-            return
-    except:
-        pass
+    # Set capabilities based on what we found
+    CONFIG['CAN_CREATE_CLIENTS'] = can_create_clients
     
-    # Default to manual if we can't detect anything specific
-    CONFIG['INSTALLATION_TYPE'] = 'manual'
-    logger.warning("Could not detect specific OpenVPN installation type. Client creation may not work.")
+    if can_create_clients:
+        logger.info("OpenVPN client management available")
+    else:
+        logger.warning("No client management tools found - monitoring only")
+        CONFIG['INSTALLATION_TYPE'] = 'monitoring_only'
 
 # Initialize paths
 detect_openvpn_paths()
@@ -406,7 +402,8 @@ def dashboard():
         'connections_last_7_days': server_stats.get('connections_last_7_days', 0),
         'unique_clients_last_7_days': server_stats.get('unique_clients_last_7_days', 0),
         'max_concurrent_connections': server_stats['summary'].get('max_concurrent_connections', 0),
-        'installation_type': CONFIG['INSTALLATION_TYPE'],
+        'can_manage_clients': CONFIG['CAN_CREATE_CLIENTS'],
+        'installation_type': 'OpenVPN' if CONFIG['CAN_CREATE_CLIENTS'] else 'OpenVPN (Monitoring Only)',
     }
     
     return render_template('dashboard.html', 
@@ -495,14 +492,21 @@ def _client_exists(client_name):
     return any(os.path.exists(path) for path in fallback_locations)
 
 def _create_openvpn_client(client_name):
-    """Create OpenVPN client based on detected installation type"""
-    if CONFIG['INSTALLATION_TYPE'] == 'angristan':
-        return _create_client_angristan(client_name)
-    elif CONFIG['INSTALLATION_TYPE'] == 'easyrsa':
-        return _create_client_easyrsa(client_name)
-    else:
-        logger.error(f"Unsupported installation type: {CONFIG['INSTALLATION_TYPE']}")
+    """Create OpenVPN client using available tools"""
+    if not CONFIG['CAN_CREATE_CLIENTS']:
+        logger.error("No client management tools available")
         return False
+        
+    # Try Angristan script first if available
+    if CONFIG.get('OPENVPN_SCRIPT') and os.path.exists(CONFIG['OPENVPN_SCRIPT']):
+        return _create_client_angristan(client_name)
+    
+    # Try EasyRSA if available
+    if CONFIG.get('EASYRSA_DIR') or subprocess.run(['which', 'easyrsa'], capture_output=True).returncode == 0:
+        return _create_client_easyrsa(client_name)
+    
+    logger.error("No supported client creation method found")
+    return False
 
 def _create_client_angristan(client_name):
     """Create OpenVPN client using Angristan's script"""
@@ -739,14 +743,21 @@ def revoke_client(client_name):
     return redirect(url_for('clients'))
 
 def _revoke_openvpn_client(client_name):
-    """Revoke OpenVPN client based on detected installation type"""
-    if CONFIG['INSTALLATION_TYPE'] == 'angristan':
-        return _revoke_client_angristan(client_name)
-    elif CONFIG['INSTALLATION_TYPE'] == 'easyrsa':
-        return _revoke_client_easyrsa(client_name)
-    else:
-        logger.error(f"Unsupported installation type for revocation: {CONFIG['INSTALLATION_TYPE']}")
+    """Revoke OpenVPN client using available tools"""
+    if not CONFIG['CAN_CREATE_CLIENTS']:
+        logger.error("No client management tools available")
         return False
+        
+    # Try Angristan script first if available
+    if CONFIG.get('OPENVPN_SCRIPT') and os.path.exists(CONFIG['OPENVPN_SCRIPT']):
+        return _revoke_client_angristan(client_name)
+    
+    # Try EasyRSA if available
+    if CONFIG.get('EASYRSA_DIR') or subprocess.run(['which', 'easyrsa'], capture_output=True).returncode == 0:
+        return _revoke_client_easyrsa(client_name)
+    
+    logger.error("No supported client revocation method found")
+    return False
 
 def _revoke_client_angristan(client_name):
     """Revoke client using Angristan script"""
