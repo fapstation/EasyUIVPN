@@ -169,7 +169,7 @@ sudo bash install.sh
 ## ⚙️ Configuration
 
 ### Environment Variables
-Create `/opt/easyvpn/.env` to customize settings:
+Create `/opt/easyuivpn/.env` to customize settings:
 ```bash
 SECRET_KEY=your-secret-key-here
 PORT=8094
@@ -225,26 +225,26 @@ server {
 ### Systemd Commands
 ```bash
 # Start the service
-sudo systemctl start easyvpn
+sudo systemctl start easyuivpn
 
 # Stop the service
-sudo systemctl stop easyvpn
+sudo systemctl stop easyuivpn
 
 # Restart the service
-sudo systemctl restart easyvpn
+sudo systemctl restart easyuivpn
 
 # Check service status
-sudo systemctl status easyvpn
+sudo systemctl status easyuivpn
 
 # View logs
-sudo journalctl -u easyvpn -f
+sudo journalctl -u easyuivpn -f
 ```
 
 ### File Locations
-- **Application**: `/opt/easyvpn/`
-- **Data**: `/var/lib/easyvpn/`
-- **Logs**: `/var/log/easyvpn/`
-- **Service**: `/etc/systemd/system/easyvpn.service`
+- **Application**: `/opt/easyuivpn/`
+- **Data**: `/var/lib/easyuivpn/`
+- **Logs**: `/var/log/easyuivpn/`
+- **Service**: `/etc/systemd/system/easyuivpn.service`
 
 ## 🐛 Troubleshooting
 
@@ -253,19 +253,19 @@ sudo journalctl -u easyvpn -f
 #### Service Won't Start
 ```bash
 # Check the service status
-sudo systemctl status easyvpn
+sudo systemctl status easyuivpn
 
 # View detailed logs
-sudo journalctl -u easyvpn -n 50
+sudo journalctl -u easyuivpn -n 50
 
 # Check permissions
-ls -la /opt/easyvpn/
+ls -la /opt/easyuivpn/
 ```
 
 #### Can't Access Web Interface
 ```bash
 # Check if the service is running
-sudo systemctl status easyvpn
+sudo systemctl status easyuivpn
 
 # Check firewall rules
 sudo ufw status
@@ -282,11 +282,11 @@ id username
 sudo -u username -i
 
 # Check sudoers configuration
-sudo visudo -f /etc/sudoers.d/easyvpn
+sudo visudo -f /etc/sudoers.d/easyuivpn
 ```
 
 ### Log Locations
-- **Application Logs**: `journalctl -u easyvpn`
+- **Application Logs**: `journalctl -u easyuivpn`
 - **OpenVPN Logs**: `/var/log/openvpn/`
 - **System Logs**: `/var/log/syslog` or `/var/log/messages`
 

@@ -19,11 +19,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default configuration
-EASYVPN_DIR="/opt/easyvpn"
-SERVICE_NAME="easyvpn"
+EASYVPN_DIR="/opt/easyuivpn"
+SERVICE_NAME="easyuivpn"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 PYTHON_VENV="$EASYVPN_DIR/venv"
-LOG_FILE="/var/log/easyvpn.log"
+LOG_FILE="/var/log/easyuivpn.log"
 PORT=8094
 AUTO_INSTALL_DEPS=false
 DEFAULT_INSTALL=false
@@ -286,13 +286,13 @@ check_and_detect_openvpn() {
 }
 
 create_user() {
-    print_status "Creating easyvpn system user..."
+    print_status "Creating easyuivpn system user..."
     
-    if ! id "easyvpn" &>/dev/null; then
-        useradd --system --no-create-home --shell /bin/false easyvpn
-        print_success "Created easyvpn user"
+    if ! id "easyuivpn" &>/dev/null; then
+        useradd --system --no-create-home --shell /bin/false easyuivpn
+        print_success "Created easyuivpn user"
     else
-        print_status "easyvpn user already exists"
+        print_status "easyuivpn user already exists"
     fi
 }
 
@@ -301,21 +301,21 @@ setup_directories() {
     
     # Create main directory
     mkdir -p "$EASYVPN_DIR"
-    mkdir -p /var/lib/easyvpn
-    mkdir -p /var/log/easyvpn
+    mkdir -p /var/lib/easyuivpn
+    mkdir -p /var/log/easyuivpn
     
     # Set permissions
-    chown -R easyvpn:easyvpn "$EASYVPN_DIR"
-    chown -R easyvpn:easyvpn /var/lib/easyvpn
-    chown -R easyvpn:easyvpn /var/log/easyvpn
+    chown -R easyuivpn:easyuivpn "$EASYVPN_DIR"
+    chown -R easyuivpn:easyuivpn /var/lib/easyuivpn
+    chown -R easyuivpn:easyuivpn /var/log/easyuivpn
     
-    # Allow easyvpn user to read OpenVPN files
-    usermod -a -G openvpn easyvpn 2>/dev/null || true
+    # Allow easyuivpn user to read OpenVPN files
+    usermod -a -G openvpn easyuivpn 2>/dev/null || true
     
     print_success "Directories created and configured"
 }
 
-download_easyvpn() {
+download_easyuivpn() {
     print_status "Downloading EasyOVPN files..."
     
     cd "$EASYVPN_DIR"
@@ -371,7 +371,7 @@ setup_python_env() {
         print_warning "requirements.txt not found, skipping Python package installation"
     fi
     
-    chown -R easyvpn:easyvpn "$PYTHON_VENV"
+    chown -R easyuivpn:easyuivpn "$PYTHON_VENV"
     
     print_success "Python environment configured"
 }
@@ -379,7 +379,7 @@ setup_python_env() {
 configure_permissions() {
     print_status "Configuring permissions for OpenVPN access..."
     
-    # Allow easyvpn user to read OpenVPN configuration and logs
+    # Allow easyuivpn user to read OpenVPN configuration and logs
     if [[ -d /etc/openvpn ]]; then
         chmod -R g+r /etc/openvpn
         chgrp -R openvpn /etc/openvpn 2>/dev/null || true
@@ -391,18 +391,18 @@ configure_permissions() {
     fi
     
     # Create sudoers rule for OpenVPN management
-    cat > /etc/sudoers.d/easyvpn << 'EOF'
-# Allow easyvpn user to manage OpenVPN and access system authentication
-easyvpn ALL=(ALL) NOPASSWD: /bin/systemctl restart openvpn@server
-easyvpn ALL=(ALL) NOPASSWD: /bin/systemctl status openvpn@server
-easyvpn ALL=(ALL) NOPASSWD: /bin/systemctl reload openvpn@server
-easyvpn ALL=(ALL) NOPASSWD: /usr/local/bin/openvpn-install.sh
-easyvpn ALL=(ALL) NOPASSWD: /usr/sbin/openvpn-install.sh
+    cat > /etc/sudoers.d/easyuivpn << 'EOF'
+# Allow easyuivpn user to manage OpenVPN and access system authentication
+easyuivpn ALL=(ALL) NOPASSWD: /bin/systemctl restart openvpn@server
+easyuivpn ALL=(ALL) NOPASSWD: /bin/systemctl status openvpn@server
+easyuivpn ALL=(ALL) NOPASSWD: /bin/systemctl reload openvpn@server
+easyuivpn ALL=(ALL) NOPASSWD: /usr/local/bin/openvpn-install.sh
+easyuivpn ALL=(ALL) NOPASSWD: /usr/sbin/openvpn-install.sh
 # Allow reading shadow file for authentication (alternative to PAM)
-easyvpn ALL=(ALL) NOPASSWD: /bin/cat /etc/shadow
+easyuivpn ALL=(ALL) NOPASSWD: /bin/cat /etc/shadow
 EOF
     
-    chmod 440 /etc/sudoers.d/easyvpn
+    chmod 440 /etc/sudoers.d/easyuivpn
     
     print_success "Permissions configured"
 }
@@ -412,14 +412,14 @@ create_systemd_service() {
     
     cat > "$SERVICE_FILE" << EOF
 [Unit]
-Description=EasyOVPN Management Interface
+Description=EasyUIVPN Management Interface
 After=network.target openvpn@server.service
 Wants=openvpn@server.service
 
 [Service]
 Type=simple
-User=easyvpn
-Group=easyvpn
+User=easyuivpn
+Group=easyuivpn
 WorkingDirectory=$EASYVPN_DIR
 Environment=PATH=$PYTHON_VENV/bin
 Environment=PORT=$PORT
@@ -428,13 +428,13 @@ Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=easyvpn
+SyslogIdentifier=easyuivpn
 
 # Security settings
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/easyvpn /var/log/easyvpn /tmp
+ReadWritePaths=/var/lib/easyuivpn /var/log/easyuivpn /tmp
 ProtectHome=true
 
 [Install]
@@ -489,10 +489,10 @@ setup_ssl_certificate() {
             openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
                 -keyout "$SSL_DIR/server.key" \
                 -out "$SSL_DIR/server.crt" \
-                -subj "/C=US/ST=State/L=City/O=Organization/CN=easyvpn" \
+                -subj "/C=US/ST=State/L=City/O=Organization/CN=easyuivpn" \
                 2>/dev/null
             
-            chown easyvpn:easyvpn "$SSL_DIR"/*
+            chown easyuivpn:easyuivpn "$SSL_DIR"/*
             chmod 600 "$SSL_DIR"/server.key
             chmod 644 "$SSL_DIR"/server.crt
             
@@ -552,8 +552,8 @@ show_completion_message() {
     echo ""
     echo -e "${BLUE}Configuration files:${NC}"
     echo -e "${YELLOW}  Application: $EASYVPN_DIR/${NC}"
-    echo -e "${YELLOW}  Data:        /var/lib/easyvpn/${NC}"
-    echo -e "${YELLOW}  Logs:        /var/log/easyvpn/${NC}"
+    echo -e "${YELLOW}  Data:        /var/lib/easyuivpn/${NC}"
+    echo -e "${YELLOW}  Logs:        /var/log/easyuivpn/${NC}"
     echo ""
     echo -e "${RED}Security Notes:${NC}"
     echo -e "${YELLOW}  • Always use HTTPS in production (consider reverse proxy)${NC}"
@@ -581,7 +581,7 @@ main() {
          check_and_detect_openvpn
         create_user
         setup_directories
-        download_easyvpn
+        download_easyuivpn
         setup_python_env
         configure_permissions
         create_systemd_service
@@ -612,7 +612,7 @@ main() {
         check_and_detect_openvpn
         create_user
         setup_directories
-        download_easyvpn
+        download_easyuivpn
         setup_python_env
         configure_permissions
         create_systemd_service

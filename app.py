@@ -42,8 +42,8 @@ CONFIG = {
     'CLIENT_DIR': '/etc/openvpn/client',
     'SERVER_CONFIG': '/etc/openvpn/server/server.conf',
     'STATUS_LOG': '/var/log/openvpn/openvpn-status.log',
-    'STATS_FILE': '/var/lib/easyvpn/stats.json',
-    'DATA_DIR': '/var/lib/easyvpn',
+    'STATS_FILE': '/var/lib/easyuivpn/stats.json',
+    'DATA_DIR': '/var/lib/easyuivpn',
     'MAX_LOGIN_ATTEMPTS': 5,
     'LOGIN_TIMEOUT': 300,  # 5 minutes
     'OPENVPN_SCRIPT': '/usr/local/bin/openvpn-install.sh',
@@ -972,7 +972,7 @@ if __name__ == '__main__':
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
         return response
     
-    print("Starting EasyOVPN Management Interface...")
+    print("Starting EasyUIVPN Management Interface...")
     print("Access the web interface at: http://your-server-ip:8094")
     print("Use your system user credentials to login.")
     
