@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}QR Code - {{ client_name }} - EasyOVPN Management{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="page-header">
+        <h1 class="page-title">QR Code Configuration</h1>
+        <p class="page-subtitle">Mobile-friendly setup for {{ client_name }}</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 400px; gap: 2rem; align-items: start;">
+        <!-- QR Code Display -->
+        <div class="card" style="text-align: center;">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-qrcode" style="color: #3b82f6;"></i>
+                    Scan to Configure
+                </h2>
+            </div>
+            
+            <div style="background: white; padding: 2rem; border-radius: 1rem; margin: 1rem auto; display: inline-block;">
+                <img src="data:image/png;base64,{{ qr_code }}" 
+                     alt="QR Code for {{ client_name }}" 
+                     style="max-width: 100%; height: auto; display: block;">
+            </div>
+            
+            <div style="margin-top: 1.5rem;">
+                <p style="color: #94a3b8; font-size: 0.875rem; margin-bottom: 1rem;">
+                    <i class="fas fa-mobile-alt"></i>
+                    Scan this QR code with your mobile device's OpenVPN app
+                </p>
+                
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <a href="{{ url_for('download_client', client_name=client_name) }}" class="btn btn-secondary">
+                        <i class="fas fa-download"></i>
+                        Download .ovpn
+                    </a>
+                    <a href="{{ url_for('clients') }}" class="btn">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Clients
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-mobile-alt" style="color: #10b981;"></i>
+                    Mobile Setup Instructions
+                </h2>
+            </div>
+            
+            <div style="space-y: 1.5rem;">
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="color: #f1f5f9; font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 24px; height: 24px; text-align: center; line-height: 24px; font-size: 0.75rem;">1</span>
+                        Install OpenVPN App
+                    </h3>
+                    <p style="color: #94a3b8; font-size: 0.875rem; margin-left: 2rem;">
+                        Download "OpenVPN Connect" from your device's app store
+                    </p>
+                    <div style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <a href="https://play.google.com/store/apps/details?id=net.openvpn.openvpn" 
+                           target="_blank" 
+                           style="color: #10b981; text-decoration: none; font-size: 0.875rem; margin-right: 1rem;">
+                            <i class="fab fa-android"></i> Android
+                        </a>
+                        <a href="https://apps.apple.com/app/openvpn-connect/id590379981" 
+                           target="_blank" 
+                           style="color: #10b981; text-decoration: none; font-size: 0.875rem;">
+                            <i class="fab fa-apple"></i> iOS
+                        </a>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="color: #f1f5f9; font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="background: #10b981; color: white; border-radius: 50%; width: 24px; height: 24px; text-align: center; line-height: 24px; font-size: 0.75rem;">2</span>
+                        Scan QR Code
+                    </h3>
+                    <p style="color: #94a3b8; font-size: 0.875rem; margin-left: 2rem;">
+                        Open the app and tap the "+" button, then select "Import from QR code"
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="color: #f1f5f9; font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="background: #ef4444; color: white; border-radius: 50%; width: 24px; height: 24px; text-align: center; line-height: 24px; font-size: 0.75rem;">3</span>
+                        Connect
+                    </h3>
+                    <p style="color: #94a3b8; font-size: 0.875rem; margin-left: 2rem;">
+                        Toggle the connection switch to connect to your VPN server
+                    </p>
+                </div>
+            </div>
+
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 0.5rem; padding: 1rem; margin-top: 1.5rem;">
+                <h4 style="color: #93c5fd; font-size: 0.875rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-info-circle"></i>
+                    Alternative Methods
+                </h4>
+                <ul style="color: #94a3b8; font-size: 0.875rem; line-height: 1.6; margin-left: 1rem;">
+                    <li>Download the .ovpn file and email it to yourself</li>
+                    <li>Transfer via cloud storage (Dropbox, Google Drive)</li>
+                    <li>Use AirDrop (iOS) or Nearby Share (Android)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Notice -->
+    <div class="card" style="margin-top: 2rem;">
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 0.75rem; padding: 1.5rem;">
+            <h3 style="color: #fca5a5; font-size: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-shield-alt"></i>
+                Security Warning
+            </h3>
+            <div style="color: #fca5a5; font-size: 0.875rem; line-height: 1.6;">
+                <p style="margin-bottom: 0.5rem;">
+                    • This QR code contains your private VPN credentials
+                </p>
+                <p style="margin-bottom: 0.5rem;">
+                    • Do not share screenshots of this QR code with others
+                </p>
+                <p style="margin-bottom: 0.5rem;">
+                    • Anyone with this QR code can access your VPN server
+                </p>
+                <p>
+                    • If compromised, revoke this client certificate immediately
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+    @media (max-width: 768px) {
+        .grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+{% endblock %}
+{% endblock %} 

@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Clients - EasyOVPN Management{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h1 class="page-title">VPN Clients</h1>
+                <p class="page-subtitle">Manage OpenVPN client certificates and configurations</p>
+            </div>
+            <a href="{{ url_for('create_client') }}" class="btn">
+                <i class="fas fa-plus"></i>
+                New Client
+            </a>
+        </div>
+    </div>
+
+    {% if clients %}
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Client Certificates</h2>
+            <span style="color: #94a3b8;">{{ clients|length }} total clients</span>
+        </div>
+        
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Client Name</th>
+                        <th>Status</th>
+                        <th>Created Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in clients %}
+                    <tr>
+                        <td>
+                            <div>
+                                <strong>{{ client.name }}</strong>
+                                <div style="font-size: 0.875rem; color: #94a3b8; margin-top: 0.25rem;">
+                                    <i class="fas fa-file"></i> {{ client.config_file }}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="client-status status-indicator {{ 'status-online' if client.connected else 'status-offline' }}" data-client="{{ client.name }}">
+                                <span class="status-dot"></span>
+                                {{ 'Online' if client.connected else 'Offline' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span>{{ client.created }}</span>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <a href="{{ url_for('download_client', client_name=client.name) }}" 
+                                   class="btn btn-sm btn-secondary" 
+                                   title="Download .ovpn file">
+                                    <i class="fas fa-download"></i>
+                                    Download
+                                </a>
+                                
+                                <a href="{{ url_for('client_qrcode', client_name=client.name) }}" 
+                                   class="btn btn-sm btn-secondary" 
+                                   title="Show QR Code">
+                                    <i class="fas fa-qrcode"></i>
+                                    QR Code
+                                </a>
+                                
+                                <form method="POST" 
+                                      action="{{ url_for('revoke_client', client_name=client.name) }}" 
+                                      style="display: inline;"
+                                      onsubmit="return confirm('Are you sure you want to revoke the certificate for {{ client.name }}? This action cannot be undone.');">
+                                    {{ csrf_token() }}
+                                    <button type="submit" 
+                                            class="btn btn-sm btn-danger" 
+                                            title="Revoke certificate">
+                                        <i class="fas fa-ban"></i>
+                                        Revoke
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Security Information -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="fas fa-info-circle" style="color: #3b82f6;"></i>
+                Client Management Information
+            </h2>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+            <div>
+                <h3 style="color: #f1f5f9; margin-bottom: 0.5rem; font-size: 1rem;">
+                    <i class="fas fa-download" style="color: #10b981;"></i>
+                    Download Options
+                </h3>
+                <ul style="color: #94a3b8; font-size: 0.875rem; line-height: 1.6;">
+                    <li><strong>Download:</strong> Get the .ovpn configuration file</li>
+                    <li><strong>QR Code:</strong> Mobile-friendly configuration import</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h3 style="color: #f1f5f9; margin-bottom: 0.5rem; font-size: 1rem;">
+                    <i class="fas fa-shield-alt" style="color: #ef4444;"></i>
+                    Security Notes
+                </h3>
+                <ul style="color: #94a3b8; font-size: 0.875rem; line-height: 1.6;">
+                    <li><strong>Revoke:</strong> Permanently disable a client certificate</li>
+                    <li><strong>Revoked certificates:</strong> Cannot be restored</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h3 style="color: #f1f5f9; margin-bottom: 0.5rem; font-size: 1rem;">
+                    <i class="fas fa-mobile-alt" style="color: #3b82f6;"></i>
+                    Mobile Setup
+                </h3>
+                <ul style="color: #94a3b8; font-size: 0.875rem; line-height: 1.6;">
+                    <li>Use QR code for easy mobile import</li>
+                    <li>Compatible with OpenVPN Connect app</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="card" style="text-align: center; padding: 4rem 2rem;">
+        <div style="color: #64748b;">
+            <i class="fas fa-users" style="font-size: 4rem; margin-bottom: 2rem; opacity: 0.5;"></i>
+            <h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: #f1f5f9;">No VPN Clients Yet</h2>
+            <p style="font-size: 1.1rem; margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto;">
+                Create your first VPN client to start managing secure connections to your server.
+            </p>
+            <a href="{{ url_for('create_client') }}" class="btn" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                <i class="fas fa-plus"></i>
+                Create First Client
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

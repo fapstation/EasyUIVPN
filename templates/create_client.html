@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Create Client - EasyOVPN Management{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="page-header">
+        <h1 class="page-title">Create New VPN Client</h1>
+        <p class="page-subtitle">Generate a new client certificate and configuration</p>
+    </div>
+
+    <div class="card" style="max-width: 600px; margin: 0 auto;">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="fas fa-plus-circle" style="color: #10b981;"></i>
+                New Client Certificate
+            </h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('create_client') }}">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-group">
+                {{ form.client_name.label(class="form-label") }}
+                {{ form.client_name(class="form-input", placeholder="e.g., laptop-john, phone-mary, office-desktop", autocomplete="off") }}
+                {% if form.client_name.errors %}
+                    {% for error in form.client_name.errors %}
+                        <div class="alert alert-error" style="margin-top: 0.5rem;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            {{ error }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                <div style="font-size: 0.875rem; color: #94a3b8; margin-top: 0.5rem;">
+                    <i class="fas fa-info-circle"></i>
+                    Use only letters, numbers, hyphens, and underscores. No spaces allowed.
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <button type="submit" class="btn" style="flex: 1;">
+                    <i class="fas fa-plus"></i>
+                    Create Client
+                </button>
+                <a href="{{ url_for('clients') }}" class="btn btn-secondary" style="flex: 1;">
+                    <i class="fas fa-arrow-left"></i>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Information Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-shield-alt" style="color: #10b981;"></i>
+                    What Gets Created
+                </h3>
+            </div>
+            <ul style="color: #94a3b8; line-height: 1.8;">
+                <li><i class="fas fa-certificate" style="color: #3b82f6;"></i> Client certificate and private key</li>
+                <li><i class="fas fa-file-code" style="color: #3b82f6;"></i> OpenVPN configuration file (.ovpn)</li>
+                <li><i class="fas fa-qrcode" style="color: #3b82f6;"></i> QR code for mobile devices</li>
+                <li><i class="fas fa-key" style="color: #3b82f6;"></i> Unique encryption keys</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-lightbulb" style="color: #f59e0b;"></i>
+                    Naming Best Practices
+                </h3>
+            </div>
+            <ul style="color: #94a3b8; line-height: 1.8;">
+                <li><i class="fas fa-laptop" style="color: #6b7280;"></i> <code>laptop-username</code></li>
+                <li><i class="fas fa-mobile-alt" style="color: #6b7280;"></i> <code>phone-username</code></li>
+                <li><i class="fas fa-desktop" style="color: #6b7280;"></i> <code>office-computer</code></li>
+                <li><i class="fas fa-tablet-alt" style="color: #6b7280;"></i> <code>tablet-username</code></li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>
+                    Security Notes
+                </h3>
+            </div>
+            <ul style="color: #94a3b8; line-height: 1.8;">
+                <li><i class="fas fa-eye-slash" style="color: #64748b;"></i> Private keys are never displayed</li>
+                <li><i class="fas fa-download" style="color: #64748b;"></i> Download configs immediately</li>
+                <li><i class="fas fa-ban" style="color: #64748b;"></i> Revoked certificates cannot be restored</li>
+                <li><i class="fas fa-clock" style="color: #64748b;"></i> Creation may take a few seconds</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %} 

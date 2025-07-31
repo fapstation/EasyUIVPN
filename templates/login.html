@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Login - EasyOVPN Management{% endblock %}
+
+{% block content %}
+<div class="login-card fade-in">
+    <div class="login-header">
+        <div class="logo" style="justify-content: center; margin-bottom: 1rem;">
+            <i class="fas fa-shield-alt"></i>
+            <span>EasyOVPN</span>
+        </div>
+        <h1 class="login-title">Welcome Back</h1>
+        <p class="login-subtitle">Sign in to manage your VPN server</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('login') }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.username.label(class="form-label") }}
+            {{ form.username(class="form-input", placeholder="Enter your username", autocomplete="username") }}
+            {% if form.username.errors %}
+                {% for error in form.username.errors %}
+                    <div class="alert alert-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{ error }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form.password.label(class="form-label") }}
+            {{ form.password(class="form-input", placeholder="Enter your password", autocomplete="current-password") }}
+            {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                    <div class="alert alert-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{ error }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; margin-top: 1rem;">
+            <i class="fas fa-sign-in-alt"></i>
+            Sign In
+        </button>
+    </form>
+
+    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid rgba(100, 116, 139, 0.2); text-align: center; color: #64748b; font-size: 0.875rem;">
+        <p><i class="fas fa-info-circle"></i> Use your system user credentials to login</p>
+        <p style="margin-top: 0.5rem;"><i class="fas fa-lock"></i> Secure authentication with rate limiting</p>
+    </div>
+</div>
+{% endblock %} 

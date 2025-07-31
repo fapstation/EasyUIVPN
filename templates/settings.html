@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - EasyOVPN Management{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="page-header">
+        <h1 class="page-title">Server Settings</h1>
+        <p class="page-subtitle">Advanced OpenVPN server configuration</p>
+    </div>
+
+    <!-- Warning Banner -->
+    <div class="alert alert-error" style="margin-bottom: 2rem;">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Advanced Users Only:</strong> Modifying these settings can break your VPN server. 
+        Always backup your configuration before making changes.
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="fas fa-cog" style="color: #f59e0b;"></i>
+                OpenVPN Server Configuration
+            </h2>
+            <div style="color: #94a3b8; font-size: 0.875rem;">
+                <i class="fas fa-file"></i>
+                /etc/openvpn/server.conf
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('settings') }}">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-group">
+                {{ form.config_content.label(class="form-label") }}
+                {{ form.config_content(class="form-input form-textarea", style="font-family: 'Courier New', monospace; font-size: 0.875rem; min-height: 400px;") }}
+                {% if form.config_content.errors %}
+                    {% for error in form.config_content.errors %}
+                        <div class="alert alert-error" style="margin-top: 0.5rem;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            {{ error }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <div style="display: flex; gap: 1rem; justify-content: space-between; align-items: center; margin-top: 2rem;">
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" class="btn">
+                        <i class="fas fa-save"></i>
+                        Save Configuration
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Cancel
+                    </a>
+                </div>
+                <div style="color: #94a3b8; font-size: 0.875rem;">
+                    <i class="fas fa-info-circle"></i>
+                    Changes require service restart
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Configuration Help -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-network-wired" style="color: #10b981;"></i>
+                    Common Network Settings
+                </h3>
+            </div>
+            <div style="font-family: 'Courier New', monospace; font-size: 0.875rem; line-height: 1.6;">
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># Server network</div>
+                    <div style="color: #10b981;">server 10.8.0.0 255.255.255.0</div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># DNS servers</div>
+                    <div style="color: #10b981;">push "dhcp-option DNS 8.8.8.8"</div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># Redirect all traffic</div>
+                    <div style="color: #10b981;">push "redirect-gateway def1"</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-shield-alt" style="color: #3b82f6;"></i>
+                    Security Options
+                </h3>
+            </div>
+            <div style="font-family: 'Courier New', monospace; font-size: 0.875rem; line-height: 1.6;">
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># Encryption cipher</div>
+                    <div style="color: #3b82f6;">cipher AES-256-CBC</div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># Authentication</div>
+                    <div style="color: #3b82f6;">auth SHA256</div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># TLS auth</div>
+                    <div style="color: #3b82f6;">tls-auth ta.key 0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-users" style="color: #f59e0b;"></i>
+                    Client Settings
+                </h3>
+            </div>
+            <div style="font-family: 'Courier New', monospace; font-size: 0.875rem; line-height: 1.6;">
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># Max clients</div>
+                    <div style="color: #f59e0b;">max-clients 10</div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># Client-to-client</div>
+                    <div style="color: #f59e0b;">client-to-client</div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #94a3b8; margin-bottom: 0.25rem;"># Keep alive</div>
+                    <div style="color: #f59e0b;">keepalive 10 120</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Control -->
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-power-off" style="color: #ef4444;"></i>
+                Service Management
+            </h3>
+        </div>
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 0.5rem; padding: 1.5rem;">
+            <p style="color: #fca5a5; margin-bottom: 1rem; font-size: 0.875rem;">
+                <i class="fas fa-exclamation-triangle"></i>
+                After modifying the configuration, you must restart the OpenVPN service:
+            </p>
+            <div style="font-family: 'Courier New', monospace; background: rgba(15, 23, 42, 0.8); padding: 1rem; border-radius: 0.5rem; color: #e2e8f0;">
+                <div style="margin-bottom: 0.5rem;"># Restart OpenVPN service</div>
+                <div style="color: #10b981;">sudo systemctl restart openvpn@server</div>
+                <div style="margin-top: 1rem; margin-bottom: 0.5rem;"># Check service status</div>
+                <div style="color: #3b82f6;">sudo systemctl status openvpn@server</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Notice -->
+    <div class="card" style="margin-top: 1rem;">
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 0.5rem; padding: 1rem;">
+            <p style="color: #6ee7b7; font-size: 0.875rem; margin: 0;">
+                <i class="fas fa-info-circle"></i>
+                <strong>Automatic Backup:</strong> A backup of your current configuration is automatically created 
+                before applying changes with timestamp in the filename.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %} 
