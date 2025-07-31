@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Statistics tracking module for EasyOVPN
+Statistics tracking module for EasyUIVPN
 Handles bandwidth monitoring, connection history, and data retention
 """
 

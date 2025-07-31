@@ -25,8 +25,8 @@ curl -O https://raw.githubusercontent.com/angristan/openvpn-install/master/openv
 chmod +x openvpn-install.sh
 sudo ./openvpn-install.sh
 
-# Then install EasyOVPN
-curl -O https://raw.githubusercontent.com/fapstation/EasyOVPN/main/install.sh
+# Then install EasyUIVPN
+curl -O https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/install.sh
 sudo bash install.sh --default
 ```
 
@@ -68,8 +68,8 @@ sudo ./easyrsa gen-req server nopass
 sudo ./easyrsa sign-req server server
 sudo ./easyrsa gen-dh
 
-# Install EasyOVPN
-curl -O https://raw.githubusercontent.com/fapstation/EasyOVPN/main/install.sh
+# Install EasyUIVPN
+curl -O https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/install.sh
 sudo bash install.sh --default
 ```
 
@@ -87,8 +87,8 @@ sudo ./easyrsa gen-req server nopass
 sudo ./easyrsa sign-req server server
 sudo ./easyrsa gen-dh
 
-# Install EasyOVPN
-curl -O https://raw.githubusercontent.com/fapstation/EasyOVPN/main/install.sh
+# Install EasyUIVPN
+curl -O https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/install.sh
 sudo bash install.sh --default
 ```
 

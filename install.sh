@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# EasyOVPN Management Interface Installer
+# EasyUIVPN Management Interface Installer
 # A lightweight, secure OpenVPN web management tool
 #
 # Usage: 
@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            echo "EasyOVPN Installer Options:"
+            echo "EasyUIVPN Installer Options:"
             echo "  --default       Unattended installation with defaults"
             echo "  --port PORT     Set custom web interface port (default: 8094)"
             echo "  --no-firewall   Skip firewall configuration"
@@ -157,10 +157,10 @@ check_and_install_dependencies() {
             echo -e "  • $dep"
         done
         echo ""
-        read -p "Would you like EasyOVPN installer to install these packages? (Y/n): " install_deps
+        read -p "Would you like EasyUIVPN installer to install these packages? (Y/n): " install_deps
         
         if [[ "$install_deps" == "n" || "$install_deps" == "N" ]]; then
-            print_warning "Dependencies not installed. EasyOVPN might not work correctly."
+            print_warning "Dependencies not installed. EasyUIVPN might not work correctly."
             read -p "Do you still want to proceed? (y/N): " proceed_anyway
             if [[ "$proceed_anyway" != "y" && "$proceed_anyway" != "Y" ]]; then
                 print_error "Installation cancelled by user"
@@ -252,13 +252,13 @@ check_and_detect_openvpn() {
         echo -e "${GREEN}🎉 FULL OPENVPN SETUP DETECTED${NC}"
         echo -e "${GREEN}   $CLIENT_TOOLS_INFO${NC}"
         echo -e "${GREEN}   ✅ Client creation and management available${NC}"
-        echo -e "${GREEN}   ✅ Complete EasyOVPN functionality${NC}"
+        echo -e "${GREEN}   ✅ Complete EasyUIVPN functionality${NC}"
         OPENVPN_COMPATIBILITY_SCORE=100
     else
         echo -e "${YELLOW}⚠️  BASIC OPENVPN INSTALLATION${NC}"
         echo -e "${YELLOW}   ✅ OpenVPN server is running${NC}"
         echo -e "${YELLOW}   ❌ No client management tools found${NC}"
-        echo -e "${YELLOW}   📊 EasyOVPN will work in monitoring mode only${NC}"
+        echo -e "${YELLOW}   📊 EasyUIVPN will work in monitoring mode only${NC}"
         OPENVPN_COMPATIBILITY_SCORE=50
         
         echo ""
@@ -280,7 +280,7 @@ check_and_detect_openvpn() {
     echo -e "${BLUE}📊 SETUP SUMMARY:${NC}"
     echo -e "${BLUE}   OpenVPN Version: ${NC}$OPENVPN_VERSION"
     echo -e "${BLUE}   Client Management: ${NC}$([ "$HAS_CLIENT_TOOLS" == true ] && echo "Available" || echo "Not Available")"
-    echo -e "${BLUE}   EasyOVPN Features: ${NC}$([ "$HAS_CLIENT_TOOLS" == true ] && echo "Full" || echo "Monitoring Only")"
+    echo -e "${BLUE}   EasyUIVPN Features: ${NC}$([ "$HAS_CLIENT_TOOLS" == true ] && echo "Full" || echo "Monitoring Only")"
     
     print_success "OpenVPN check completed"
 }
@@ -316,14 +316,14 @@ setup_directories() {
 }
 
 download_easyuivpn() {
-    print_status "Downloading EasyOVPN files..."
+    print_status "Downloading EasyUIVPN files..."
     
     cd "$EASYVPN_DIR"
     
     # Download application files (in a real scenario, these would come from GitHub)
     # For now, we'll create them directly
     
-    print_success "EasyOVPN files downloaded"
+    print_success "EasyUIVPN files downloaded"
 }
 
 setup_python_env() {
@@ -453,7 +453,7 @@ configure_firewall() {
     
     # UFW (Ubuntu/Debian)
     if command -v ufw &> /dev/null; then
-        ufw allow "$PORT/tcp" comment "EasyOVPN Web Interface"
+        ufw allow "$PORT/tcp" comment "EasyUIVPN Web Interface"
         print_success "UFW rule added for port $PORT"
     
     # Firewalld (CentOS/RHEL/Fedora)
@@ -504,7 +504,7 @@ setup_ssl_certificate() {
 }
 
 start_service() {
-    print_status "Starting EasyOVPN service..."
+    print_status "Starting EasyUIVPN service..."
     
     systemctl start "$SERVICE_NAME"
     
@@ -512,9 +512,9 @@ start_service() {
     sleep 3
     
     if systemctl is-active --quiet "$SERVICE_NAME"; then
-        print_success "EasyOVPN service started successfully"
+        print_success "EasyUIVPN service started successfully"
     else
-        print_error "Failed to start EasyOVPN service"
+        print_error "Failed to start EasyUIVPN service"
         print_error "Check logs with: journalctl -u $SERVICE_NAME -f"
         exit 1
     fi
@@ -534,7 +534,7 @@ show_completion_message() {
     
     echo ""
     echo "=================================================================="
-    print_success "EasyOVPN Management Interface installed successfully!"
+    print_success "EasyUIVPN Management Interface installed successfully!"
     echo "=================================================================="
     echo ""
     echo -e "${BLUE}Access your VPN management interface at:${NC}"
@@ -558,7 +558,7 @@ show_completion_message() {
     echo -e "${RED}Security Notes:${NC}"
     echo -e "${YELLOW}  • Always use HTTPS in production (consider reverse proxy)${NC}"
     echo -e "${YELLOW}  • Restrict access to the management interface${NC}"
-    echo -e "${YELLOW}  • Regularly update the system and EasyOVPN${NC}"
+    echo -e "${YELLOW}  • Regularly update the system and EasyUIVPN${NC}"
     echo -e "${YELLOW}  • Monitor logs for suspicious activity${NC}"
     echo ""
     echo "=================================================================="
@@ -568,7 +568,7 @@ show_completion_message() {
 main() {
     echo ""
     echo "=================================================================="
-    echo -e "${GREEN}EasyOVPN Management Interface Installer${NC}"
+    echo -e "${GREEN}EasyUIVPN Management Interface Installer${NC}"
     echo "=================================================================="
     echo ""
     

@@ -159,7 +159,7 @@ cython_debug/
 #  This is only to be ignored by git. It's also recommended to add the same files and folders to your IDE's git ignore to avoid them from being staged.
 .idea/
 
-# EasyOVPN specific
+# EasyUIVPN specific
 *.ovpn
 ssl/
 *.key
