@@ -50,12 +50,22 @@ while [[ $# -gt 0 ]]; do
             SSL_SETUP=true
             shift
             ;;
+        --uninstall)
+            uninstall_easyuivpn
+            exit 0
+            ;;
+        --update)
+            update_easyuivpn
+            exit 0
+            ;;
         -h|--help)
             echo "EasyUIVPN Installer Options:"
             echo "  --default       Unattended installation with defaults"
             echo "  --port PORT     Set custom web interface port (default: 8094)"
             echo "  --no-firewall   Skip firewall configuration"
             echo "  --ssl           Generate self-signed SSL certificate"
+            echo "  --uninstall     Remove EasyUIVPN completely from the system"
+            echo "  --update        Update EasyUIVPN to the latest version"
             echo "  -h, --help      Show this help message"
             exit 0
             ;;
@@ -553,6 +563,199 @@ get_server_ip() {
                 echo "YOUR_SERVER_IP")
 }
 
+uninstall_easyuivpn() {
+    echo ""
+    echo "=================================================================="
+    echo -e "${RED}EasyUIVPN Uninstaller${NC}"
+    echo "=================================================================="
+    echo ""
+    
+    # Check if running as root
+    if [[ $EUID -ne 0 ]]; then
+        print_error "This script must be run as root (use sudo)"
+        exit 1
+    fi
+    
+    # Confirm uninstallation
+    echo -e "${YELLOW}This will completely remove EasyUIVPN from your system.${NC}"
+    echo -e "${YELLOW}The following will be removed:${NC}"
+    echo -e "${RED}  • Service: $SERVICE_NAME${NC}"
+    echo -e "${RED}  • Application directory: $EASYVPN_DIR${NC}"
+    echo -e "${RED}  • Data directory: /var/lib/easyuivpn${NC}"
+    echo -e "${RED}  • Log directory: /var/log/easyuivpn${NC}"
+    echo -e "${RED}  • System user: easyuivpn${NC}"
+    echo -e "${RED}  • Sudoers configuration${NC}"
+    echo -e "${RED}  • Firewall rules (if configured)${NC}"
+    echo ""
+    echo -e "${YELLOW}OpenVPN server and clients will NOT be removed.${NC}"
+    echo ""
+    
+    read -p "Are you sure you want to continue? (type 'yes' to confirm): " confirm
+    if [[ "$confirm" != "yes" ]]; then
+        print_status "Uninstallation cancelled."
+        exit 0
+    fi
+    
+    print_status "Stopping and disabling EasyUIVPN service..."
+    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+    systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+    
+    print_status "Removing service file..."
+    rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
+    systemctl daemon-reload
+    
+    print_status "Removing application directory..."
+    rm -rf "$EASYVPN_DIR"
+    
+    print_status "Removing data and log directories..."
+    rm -rf "/var/lib/easyuivpn"
+    rm -rf "/var/log/easyuivpn"
+    
+    print_status "Removing system user..."
+    userdel easyuivpn 2>/dev/null || true
+    groupdel easyuivpn 2>/dev/null || true
+    
+    print_status "Removing sudoers configuration..."
+    rm -f "/etc/sudoers.d/easyuivpn"
+    
+    print_status "Removing firewall rules..."
+    # Remove UFW rule
+    if command -v ufw &> /dev/null; then
+        ufw delete allow "$PORT/tcp" 2>/dev/null || true
+    fi
+    
+    # Remove iptables rule (basic attempt)
+    if command -v iptables &> /dev/null; then
+        iptables -D INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || true
+    fi
+    
+    echo ""
+    print_success "EasyUIVPN has been completely removed from your system!"
+    echo ""
+    echo -e "${BLUE}What was NOT removed:${NC}"
+    echo -e "${GREEN}  • OpenVPN server and configuration${NC}"
+    echo -e "${GREEN}  • OpenVPN client certificates${NC}"
+    echo -e "${GREEN}  • System packages (Python, curl, etc.)${NC}"
+    echo ""
+}
+
+update_easyuivpn() {
+    echo ""
+    echo "=================================================================="
+    echo -e "${GREEN}EasyUIVPN Updater${NC}"
+    echo "=================================================================="
+    echo ""
+    
+    # Check if running as root
+    if [[ $EUID -ne 0 ]]; then
+        print_error "This script must be run as root (use sudo)"
+        exit 1
+    fi
+    
+    # Check if EasyUIVPN is installed
+    if [[ ! -d "$EASYVPN_DIR" ]] || [[ ! -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
+        print_error "EasyUIVPN doesn't appear to be installed. Use regular installation instead."
+        exit 1
+    fi
+    
+    print_status "Checking for updates..."
+    
+    # Get current version (try to read from app.py if possible)
+    CURRENT_VERSION="1.0.0"
+    if [[ -f "$EASYVPN_DIR/app.py" ]]; then
+        DETECTED_VERSION=$(grep "__version__" "$EASYVPN_DIR/app.py" | cut -d'"' -f2 2>/dev/null || echo "1.0.0")
+        if [[ "$DETECTED_VERSION" != "" ]]; then
+            CURRENT_VERSION="$DETECTED_VERSION"
+        fi
+    fi
+    
+    # Check latest version from GitHub
+    LATEST_VERSION=$(curl -s "https://api.github.com/repos/fapstation/EasyUIVPN/releases/latest" | grep '"tag_name"' | cut -d'"' -f4 | sed 's/^v//' 2>/dev/null || echo "")
+    
+    if [[ "$LATEST_VERSION" == "" ]]; then
+        print_warning "Could not check for updates. Proceeding with reinstallation..."
+        LATEST_VERSION="latest"
+    else
+        echo -e "${BLUE}Current Version: ${NC}$CURRENT_VERSION"
+        echo -e "${BLUE}Latest Version:  ${NC}$LATEST_VERSION"
+        echo ""
+        
+        if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
+            echo -e "${GREEN}You already have the latest version!${NC}"
+            read -p "Do you want to reinstall anyway? (y/N): " reinstall
+            if [[ "$reinstall" != "y" && "$reinstall" != "Y" ]]; then
+                print_status "Update cancelled."
+                exit 0
+            fi
+        fi
+    fi
+    
+    # Save current configuration
+    print_status "Backing up current configuration..."
+    BACKUP_DIR="/tmp/easyuivpn_backup_$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "$BACKUP_DIR"
+    
+    # Backup service file to preserve custom port
+    if [[ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
+        cp "/etc/systemd/system/${SERVICE_NAME}.service" "$BACKUP_DIR/"
+        
+        # Extract current port from service file
+        CURRENT_PORT=$(grep "Environment=PORT=" "/etc/systemd/system/${SERVICE_NAME}.service" | cut -d'=' -f3 2>/dev/null || echo "8094")
+        if [[ "$CURRENT_PORT" != "" ]]; then
+            PORT="$CURRENT_PORT"
+        fi
+    fi
+    
+    # Backup any custom data
+    if [[ -d "/var/lib/easyuivpn" ]]; then
+        cp -r "/var/lib/easyuivpn" "$BACKUP_DIR/" 2>/dev/null || true
+    fi
+    
+    print_success "Configuration backed up to: $BACKUP_DIR"
+    
+    # Stop service
+    print_status "Stopping EasyUIVPN service..."
+    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+    
+    # Remove application directory but preserve some settings
+    print_status "Updating application files..."
+    rm -rf "$EASYVPN_DIR"
+    
+    # Restore data directory
+    if [[ -d "$BACKUP_DIR/easyuivpn" ]]; then
+        print_status "Restoring data..."
+        cp -r "$BACKUP_DIR/easyuivpn" "/var/lib/" 2>/dev/null || true
+    fi
+    
+    print_status "Installing updated version..."
+    
+    # Set update mode flags
+    DEFAULT_INSTALL=true
+    AUTO_INSTALL_DEPS=false  # Don't reinstall dependencies
+    
+    # Run installation steps
+    create_user
+    setup_directories  
+    download_easyuivpn
+    setup_python_env
+    configure_permissions
+    create_systemd_service
+    start_service
+    
+    # Clean up backup
+    print_status "Cleaning up..."
+    rm -rf "$BACKUP_DIR"
+    
+    echo ""
+    print_success "EasyUIVPN has been successfully updated!"
+    echo ""
+    echo -e "${BLUE}Service Status:${NC}"
+    systemctl status "$SERVICE_NAME" --no-pager -l || true
+    echo ""
+    echo -e "${GREEN}Access your updated interface at: http://$(hostname -I | awk '{print $1}'):$PORT${NC}"
+    echo ""
+}
+
 setup_autostart() {
     print_status "Setting up autostart configuration..."
     
@@ -614,9 +817,11 @@ show_completion_message() {
     echo -e "${YELLOW}  Data:        /var/lib/easyuivpn/${NC}"
     echo -e "${YELLOW}  Logs:        /var/log/easyuivpn/${NC}"
     echo ""
-    echo -e "${BLUE}Update Information:${NC}"
+    echo -e "${BLUE}Update & Management:${NC}"
     echo -e "${YELLOW}  Current Version: 1.0.0${NC}"
-    echo -e "${YELLOW}  Check updates at: https://github.com/fapstation/EasyUIVPN/releases${NC}"
+    echo -e "${YELLOW}  Update: curl -O https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/install.sh && sudo bash install.sh --update${NC}"
+    echo -e "${YELLOW}  Uninstall: sudo bash install.sh --uninstall${NC}"
+    echo -e "${YELLOW}  Check releases: https://github.com/fapstation/EasyUIVPN/releases${NC}"
     echo ""
     
     echo -e "${RED}Security Notes:${NC}"
