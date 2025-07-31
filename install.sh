@@ -320,8 +320,32 @@ download_easyuivpn() {
     
     cd "$EASYVPN_DIR"
     
-    # Download application files (in a real scenario, these would come from GitHub)
-    # For now, we'll create them directly
+    # Download main application files from GitHub
+    curl -sSL -o app.py https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/app.py
+    curl -sSL -o stats.py https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/stats.py
+    curl -sSL -o requirements.txt https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/requirements.txt
+    
+    # Create templates directory and download templates
+    mkdir -p templates
+    curl -sSL -o templates/base.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/base.html
+    curl -sSL -o templates/login.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/login.html
+    curl -sSL -o templates/dashboard.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/dashboard.html
+    curl -sSL -o templates/clients.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/clients.html
+    curl -sSL -o templates/create_client.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/create_client.html
+    curl -sSL -o templates/settings.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/settings.html
+    curl -sSL -o templates/qrcode.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/qrcode.html
+    curl -sSL -o templates/error.html https://raw.githubusercontent.com/fapstation/EasyUIVPN/main/templates/error.html
+    
+    # Verify critical files were downloaded
+    if [[ ! -f app.py ]]; then
+        print_error "Failed to download app.py"
+        exit 1
+    fi
+    
+    if [[ ! -f requirements.txt ]]; then
+        print_error "Failed to download requirements.txt"
+        exit 1
+    fi
     
     print_success "EasyUIVPN files downloaded"
 }
