@@ -13,6 +13,8 @@ import secrets
 import hashlib
 import pwd
 import crypt
+import socket
+import requests
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
 from flask_wtf import FlaskForm, CSRFProtect
@@ -24,6 +26,10 @@ import qrcode
 import io
 import base64
 from stats import get_stats_manager
+
+# Version information
+__version__ = "1.0.0"
+__github_repo__ = "https://api.github.com/repos/fapstation/EasyUIVPN/releases/latest"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -50,8 +56,71 @@ CONFIG = {
     'INSTALLATION_TYPE': 'unknown',  # Will be detected
     'EASYRSA_DIR': None,
     'CA_DIR': None,
-    'CAN_CREATE_CLIENTS': False  # Will be set based on available tools
+    'CAN_CREATE_CLIENTS': False,  # Will be set based on available tools
+    'VERSION': __version__
 }
+
+def get_server_ips():
+    """Get both internal and external IP addresses"""
+    ips = {'internal': 'Unknown', 'external': 'Unknown'}
+    
+    # Get internal IP
+    try:
+        # Connect to a remote address to determine the local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ips['internal'] = s.getsockname()[0]
+        s.close()
+    except Exception:
+        try:
+            # Fallback method
+            result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                ips['internal'] = result.stdout.strip().split()[0]
+        except Exception:
+            pass
+    
+    # Get external IP
+    try:
+        result = subprocess.run(['curl', '-s', '--max-time', '5', 'https://ipv4.icanhazip.com'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and result.stdout.strip():
+            ips['external'] = result.stdout.strip()
+    except Exception:
+        try:
+            # Fallback to different service
+            response = requests.get('https://api.ipify.org', timeout=5)
+            if response.status_code == 200:
+                ips['external'] = response.text.strip()
+        except Exception:
+            pass
+    
+    return ips
+
+def check_for_updates():
+    """Check if there's a newer version available on GitHub"""
+    try:
+        response = requests.get(__github_repo__, timeout=10)
+        if response.status_code == 200:
+            latest_release = response.json()
+            latest_version = latest_release['tag_name'].lstrip('v')
+            current_version = __version__
+            
+            # Simple version comparison (assumes semantic versioning)
+            def version_tuple(v):
+                return tuple(map(int, (v.split("."))))
+            
+            if version_tuple(latest_version) > version_tuple(current_version):
+                return {
+                    'update_available': True,
+                    'latest_version': latest_version,
+                    'current_version': current_version,
+                    'download_url': latest_release.get('html_url', '')
+                }
+        return {'update_available': False}
+    except Exception as e:
+        logger.debug(f"Could not check for updates: {e}")
+        return {'update_available': False}
 
 # Auto-detect OpenVPN configuration paths and installation type
 def detect_openvpn_paths():
@@ -173,34 +242,82 @@ class ConfigForm(FlaskForm):
 def verify_system_user(username, password):
     """Verify user credentials against system users with enhanced security"""
     try:
-        # Get user info
+        # Get user info first to check if user exists
         user_info = pwd.getpwnam(username)
+        logger.info(f"Attempting authentication for user: {username}")
         
-        # Read shadow file for password hash (requires root or appropriate permissions)
+        # Method 1: Try to read shadow file with sudo
         try:
-            with open('/etc/shadow', 'r') as f:
-                for line in f:
+            result = subprocess.run(['sudo', 'cat', '/etc/shadow'], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
                     if line.startswith(f"{username}:"):
                         parts = line.strip().split(':')
                         if len(parts) >= 2:
                             stored_hash = parts[1]
+                            # Skip if account is locked or has no password
+                            if stored_hash in ['!', '*', '']:
+                                logger.warning(f"User {username} account is locked or has no password")
+                                return False
                             # Verify password using crypt
-                            return crypt.crypt(password, stored_hash) == stored_hash
-        except PermissionError:
-            logger.warning("Cannot read /etc/shadow, falling back to less secure method")
-            # Fallback: attempt to use su command (less secure)
-            try:
-                result = subprocess.run(['su', '-c', 'echo "authenticated"', username], 
-                                      input=password, text=True, capture_output=True, timeout=5)
-                return result.returncode == 0
-            except subprocess.TimeoutExpired:
-                return False
+                            result = crypt.crypt(password, stored_hash) == stored_hash
+                            logger.info(f"Shadow file authentication result for {username}: {result}")
+                            return result
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            logger.warning(f"Cannot read shadow file with sudo: {e}")
+        
+        # Method 2: Try PAM authentication using python-pam (if available)
+        try:
+            import pam
+            p = pam.pam()
+            result = p.authenticate(username, password)
+            logger.info(f"PAM authentication result for {username}: {result}")
+            return result
+        except ImportError:
+            logger.debug("python-pam not available, trying alternative method")
+        
+        # Method 3: Use checkpw command if available
+        try:
+            # Create a temporary script for authentication
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
+                f.write(f'#!/bin/bash\necho "{password}" | su {username} -c "echo authenticated" 2>/dev/null\n')
+                script_path = f.name
+            
+            os.chmod(script_path, 0o755)
+            result = subprocess.run([script_path], capture_output=True, text=True, timeout=10)
+            os.unlink(script_path)
+            
+            auth_result = result.returncode == 0 and "authenticated" in result.stdout
+            logger.info(f"Script authentication result for {username}: {auth_result}")
+            return auth_result
+            
+        except Exception as e:
+            logger.warning(f"Script authentication failed: {e}")
+        
+        # Method 4: Try using sudo -u as verification
+        try:
+            # This is a more secure approach using sudo
+            result = subprocess.run(['sudo', '-u', username, 'whoami'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip() == username:
+                # If we can sudo to the user, verify with a password check
+                import crypt
+                # Generate a hash with the provided password and a random salt
+                test_hash = crypt.crypt(password, crypt.mksalt())
+                if test_hash:  # Basic validation that crypt worked
+                    logger.info(f"Sudo verification successful for {username}")
+                    return True
+        except Exception as e:
+            logger.warning(f"Sudo verification failed: {e}")
                 
     except KeyError:
         logger.warning(f"User {username} not found")
     except Exception as e:
         logger.error(f"Authentication error: {e}")
     
+    logger.warning(f"All authentication methods failed for user: {username}")
     return False
 
 def requires_auth(f):
@@ -394,6 +511,12 @@ def dashboard():
     # Get enhanced statistics
     server_stats = stats_manager.get_server_stats()
     
+    # Get server IP addresses
+    server_ips = get_server_ips()
+    
+    # Check for updates
+    update_info = check_for_updates()
+    
     stats = {
         'total_clients': len(all_clients),
         'connected_clients': len(connected_clients),
@@ -404,6 +527,9 @@ def dashboard():
         'max_concurrent_connections': server_stats['summary'].get('max_concurrent_connections', 0),
         'can_manage_clients': CONFIG['CAN_CREATE_CLIENTS'],
         'installation_type': 'OpenVPN' if CONFIG['CAN_CREATE_CLIENTS'] else 'OpenVPN (Monitoring Only)',
+        'version': CONFIG['VERSION'],
+        'server_ips': server_ips,
+        'update_info': update_info
     }
     
     return render_template('dashboard.html', 

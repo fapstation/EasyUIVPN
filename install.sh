@@ -553,6 +553,36 @@ get_server_ip() {
                 echo "YOUR_SERVER_IP")
 }
 
+setup_autostart() {
+    print_status "Setting up autostart configuration..."
+    
+    # Check if systemctl is available (systemd system)
+    if command -v systemctl &> /dev/null; then
+        if [[ "$DEFAULT_INSTALL" == true ]]; then
+            # Auto-enable in default installation
+            systemctl enable "$SERVICE_NAME"
+            print_success "EasyUIVPN enabled for autostart"
+        else
+            # Ask user in interactive installation
+            echo ""
+            echo -e "${BLUE}Autostart Configuration:${NC}"
+            echo -e "${YELLOW}Would you like EasyUIVPN to start automatically at boot?${NC}"
+            echo -e "${GREEN}This ensures your VPN management interface is always available.${NC}"
+            echo ""
+            read -p "Enable autostart? (Y/n): " enable_autostart
+            
+            if [[ "$enable_autostart" != "n" && "$enable_autostart" != "N" ]]; then
+                systemctl enable "$SERVICE_NAME"
+                print_success "EasyUIVPN enabled for autostart"
+            else
+                print_status "Autostart not configured. You can enable it later with: systemctl enable $SERVICE_NAME"
+            fi
+        fi
+    else
+        print_warning "Systemd not detected. Manual autostart configuration may be required."
+    fi
+}
+
 show_completion_message() {
     get_server_ip
     
@@ -561,16 +591,21 @@ show_completion_message() {
     print_success "EasyUIVPN Management Interface installed successfully!"
     echo "=================================================================="
     echo ""
-    echo -e "${BLUE}Access your VPN management interface at:${NC}"
-    echo -e "${GREEN}  http://$SERVER_IP:$PORT${NC}"
+    # Get both internal and external IP addresses
+    INTERNAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+    EXTERNAL_IP=$(curl -s --max-time 5 https://ipv4.icanhazip.com 2>/dev/null || curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "Unknown")
+    
+    echo -e "${BLUE}Access Information:${NC}"
+    if [[ "$EXTERNAL_IP" != "Unknown" && "$EXTERNAL_IP" != "" ]]; then
+        echo -e "${GREEN}  External Access: http://$EXTERNAL_IP:$PORT${NC}"
+    fi
+    echo -e "${GREEN}  Internal Access: http://$INTERNAL_IP:$PORT${NC}"
+    echo -e "${GREEN}  Local Access: http://localhost:$PORT${NC}"
+    echo -e "${YELLOW}  Username: Use your system user credentials (e.g., root, admin)${NC}"
     echo ""
-    echo -e "${BLUE}Default login credentials:${NC}"
-    echo -e "${YELLOW}  Use your system user credentials (same as SSH login)${NC}"
-    echo ""
-    echo -e "${BLUE}Service management:${NC}"
+    echo -e "${BLUE}Service Management:${NC}"
     echo -e "${YELLOW}  Start:   systemctl start $SERVICE_NAME${NC}"
     echo -e "${YELLOW}  Stop:    systemctl stop $SERVICE_NAME${NC}"
-    echo -e "${YELLOW}  Restart: systemctl restart $SERVICE_NAME${NC}"
     echo -e "${YELLOW}  Status:  systemctl status $SERVICE_NAME${NC}"
     echo -e "${YELLOW}  Logs:    journalctl -u $SERVICE_NAME -f${NC}"
     echo ""
@@ -579,7 +614,14 @@ show_completion_message() {
     echo -e "${YELLOW}  Data:        /var/lib/easyuivpn/${NC}"
     echo -e "${YELLOW}  Logs:        /var/log/easyuivpn/${NC}"
     echo ""
+    echo -e "${BLUE}Update Information:${NC}"
+    echo -e "${YELLOW}  Current Version: 1.0.0${NC}"
+    echo -e "${YELLOW}  Check updates at: https://github.com/fapstation/EasyUIVPN/releases${NC}"
+    echo ""
+    
     echo -e "${RED}Security Notes:${NC}"
+    echo -e "${YELLOW}  • Change default passwords for all user accounts${NC}"
+    echo -e "${YELLOW}  • Consider setting up a firewall if not already configured${NC}"
     echo -e "${YELLOW}  • Always use HTTPS in production (consider reverse proxy)${NC}"
     echo -e "${YELLOW}  • Restrict access to the management interface${NC}"
     echo -e "${YELLOW}  • Regularly update the system and EasyUIVPN${NC}"
@@ -616,6 +658,7 @@ main() {
             setup_ssl_certificate
         fi
         start_service
+        setup_autostart
         show_completion_message
     else
         print_status "Interactive installation mode. Please answer questions."
@@ -647,6 +690,7 @@ main() {
             setup_ssl_certificate
         fi
         start_service
+        setup_autostart
         show_completion_message
     fi
 }
