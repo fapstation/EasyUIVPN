@@ -246,7 +246,20 @@ def verify_system_user(username, password):
         user_info = pwd.getpwnam(username)
         logger.info(f"Attempting authentication for user: {username}")
         
-        # Method 1: Try to read shadow file with sudo
+        # Method 1: Try PAM authentication first (most reliable) 
+        try:
+            import pam
+            p = pam.pam()
+            result = p.authenticate(username, password)
+            logger.info(f"PAM authentication result for {username}: {result}")
+            if result:
+                return True
+        except ImportError:
+            logger.debug("python-pam not available, trying alternative method")
+        except Exception as e:
+            logger.warning(f"PAM authentication failed: {e}")
+        
+        # Method 2: Try to read shadow file with sudo (backup method)
         try:
             result = subprocess.run(['sudo', 'cat', '/etc/shadow'], 
                                   capture_output=True, text=True, timeout=10)
@@ -267,50 +280,46 @@ def verify_system_user(username, password):
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
             logger.warning(f"Cannot read shadow file with sudo: {e}")
         
-        # Method 2: Try PAM authentication using python-pam (if available)
+        # Method 3: Try using passwd authentication with expect
         try:
-            import pam
-            p = pam.pam()
-            result = p.authenticate(username, password)
-            logger.info(f"PAM authentication result for {username}: {result}")
-            return result
-        except ImportError:
-            logger.debug("python-pam not available, trying alternative method")
-        
-        # Method 3: Use checkpw command if available
-        try:
-            # Create a temporary script for authentication
+            # This method uses a simple authentication check
+            import subprocess
             import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
-                f.write(f'#!/bin/bash\necho "{password}" | su {username} -c "echo authenticated" 2>/dev/null\n')
+            
+            # Create a simple test script that tries to authenticate
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+                f.write(f'''#!/usr/bin/env python3
+import subprocess
+import sys
+try:
+    # Try to run a command as the user with password
+    proc = subprocess.Popen(['sudo', '-S', '-u', '{username}', 'whoami'], 
+                           stdin=subprocess.PIPE, 
+                           stdout=subprocess.PIPE, 
+                           stderr=subprocess.PIPE, 
+                           text=True)
+    output, error = proc.communicate(input='{password}\\n', timeout=5)
+    if proc.returncode == 0 and output.strip() == '{username}':
+        print("SUCCESS")
+    else:
+        print("FAILED")
+except Exception as e:
+    print("FAILED")
+''')
                 script_path = f.name
             
             os.chmod(script_path, 0o755)
-            result = subprocess.run([script_path], capture_output=True, text=True, timeout=10)
+            result = subprocess.run(['python3', script_path], 
+                                  capture_output=True, text=True, timeout=15)
             os.unlink(script_path)
             
-            auth_result = result.returncode == 0 and "authenticated" in result.stdout
+            auth_result = result.returncode == 0 and "SUCCESS" in result.stdout
             logger.info(f"Script authentication result for {username}: {auth_result}")
-            return auth_result
-            
+            if auth_result:
+                return True
+                
         except Exception as e:
             logger.warning(f"Script authentication failed: {e}")
-        
-        # Method 4: Try using sudo -u as verification
-        try:
-            # This is a more secure approach using sudo
-            result = subprocess.run(['sudo', '-u', username, 'whoami'], 
-                                  capture_output=True, text=True, timeout=5)
-            if result.returncode == 0 and result.stdout.strip() == username:
-                # If we can sudo to the user, verify with a password check
-                import crypt
-                # Generate a hash with the provided password and a random salt
-                test_hash = crypt.crypt(password, crypt.mksalt())
-                if test_hash:  # Basic validation that crypt worked
-                    logger.info(f"Sudo verification successful for {username}")
-                    return True
-        except Exception as e:
-            logger.warning(f"Sudo verification failed: {e}")
                 
     except KeyError:
         logger.warning(f"User {username} not found")
@@ -1081,6 +1090,29 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return render_template('error.html', error="Internal server error"), 500
+
+# Add a debug route for testing authentication (remove in production)
+@app.route('/debug/auth', methods=['GET', 'POST'])
+def debug_auth():
+    """Debug authentication - remove in production"""
+    if not app.debug:
+        return "Debug mode only", 403
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username and password:
+            result = verify_system_user(username, password)
+            return f"Authentication result for {username}: {result}"
+    
+    return '''
+    <form method="post">
+        Username: <input type="text" name="username"><br>
+        Password: <input type="password" name="password"><br>
+        <input type="submit" value="Test Auth">
+    </form>
+    '''
 
 if __name__ == '__main__':
     # Ensure data directory exists

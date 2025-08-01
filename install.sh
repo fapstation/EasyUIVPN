@@ -51,10 +51,12 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --uninstall)
+            check_root
             uninstall_easyuivpn
             exit 0
             ;;
         --update)
+            check_root
             update_easyuivpn
             exit 0
             ;;
@@ -196,11 +198,15 @@ install_dependencies_now() {
             print_status "Installing Python venv package for version $PYTHON_VERSION..."
             apt-get install -y "python${PYTHON_VERSION}-venv" || apt-get install -y python3-venv
         fi
+        
+        # Install PAM development libraries for python-pam
+        apt-get install -y libpam0g-dev python3-dev build-essential
+        
     elif [[ "$OS" == "redhat" ]]; then
         if command -v dnf &> /dev/null; then
-            dnf install -y python3 python3-pip git curl wget unzip
+            dnf install -y python3 python3-pip git curl wget unzip pam-devel python3-devel gcc
         else
-            yum install -y python3 python3-pip git curl wget unzip
+            yum install -y python3 python3-pip git curl wget unzip pam-devel python3-devel gcc
         fi
     fi
     
@@ -395,11 +401,18 @@ setup_python_env() {
         print_warning "Failed to upgrade pip, continuing anyway..."
     fi
     
-    # Install requirements
+    # Install requirements with retries for python-pam
     if [[ -f requirements.txt ]]; then
+        # Try to install requirements with a fallback for python-pam
         if ! pip install -r requirements.txt; then
-            print_error "Failed to install Python requirements"
-            exit 1
+            print_warning "Some packages failed to install, trying alternatives..."
+            # Install packages one by one, skipping python-pam if it fails
+            pip install Flask==2.3.3 Flask-WTF==1.2.1 WTForms==3.1.1 qrcode[pil]==7.4.2 requests==2.31.0
+            
+            # Try to install python-pam with fallback
+            if ! pip install python-pam==2.1.2; then
+                print_warning "python-pam installation failed. Authentication will use fallback methods."
+            fi
         fi
     else
         print_warning "requirements.txt not found, skipping Python package installation"

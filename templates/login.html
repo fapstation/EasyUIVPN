@@ -18,7 +18,7 @@
         {% if messages %}
             <div style="margin-bottom: 1.5rem;">
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else 'warning' if category == 'warning' else 'success' }}" style="padding: 0.75rem 1rem; border-radius: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #fca5a5; text-align: center; font-size: 0.875rem; margin-bottom: 0.5rem;">
+                    <div class="alert alert-{{ 'error' if category == 'error' else 'info' if category == 'warning' else 'success' }}">
                         <i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
                         {{ message }}
                     </div>
